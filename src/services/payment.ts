@@ -9,6 +9,10 @@ interface PaymentDetails {
   status: 'pending' | 'completed' | 'failed';
 }
 
+// Production Razorpay configuration
+const RAZORPAY_KEY_ID = import.meta.env.VITE_RAZORPAY_KEY_ID;
+const RAZORPAY_KEY_SECRET = import.meta.env.VITE_RAZORPAY_KEY_SECRET;
+
 export const processPayment = async (paymentDetails: PaymentDetails): Promise<{ success: boolean; redirectUrl?: string }> => {
   try {
     // Create payment record
@@ -23,18 +27,31 @@ export const processPayment = async (paymentDetails: PaymentDetails): Promise<{ 
       paymentId: paymentRef.id
     });
 
-    // Return Razorpay URL with parameters
-    const razorpayUrl = 'https://rzp.io/rzp/bh9CNEVH';
-    const params = new URLSearchParams({
-      amount: Math.round(paymentDetails.amount * 100).toString(),
+    // Initialize Razorpay payment
+    const options = {
+      key: RAZORPAY_KEY_ID,
+      amount: Math.round(paymentDetails.amount * 100), // Convert to paise
+      currency: "INR",
+      name: "KiranaKart",
+      description: `Order #${paymentDetails.orderId}`,
       order_id: paymentDetails.orderId,
-      payment_id: paymentRef.id,
-    });
-
-    return { 
-      success: true,
-      redirectUrl: `${razorpayUrl}?${params.toString()}`
+      handler: function (response: any) {
+        verifyPayment(response.razorpay_payment_id, paymentDetails.orderId);
+      },
+      prefill: {
+        name: "Customer Name",
+        email: "customer@example.com",
+        contact: "9999999999"
+      },
+      theme: {
+        color: "#059669"
+      }
     };
+
+    const razorpay = new (window as any).Razorpay(options);
+    razorpay.open();
+
+    return { success: true };
   } catch (error) {
     console.error('Payment processing error:', error);
     return { success: false };
